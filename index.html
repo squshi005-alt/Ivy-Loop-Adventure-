@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Ivy Loop Adventure</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #a1aee6; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; touch-action: manipulation; }
+    #game-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; position: fixed; left: 0; top: 0; right: 0; bottom: 0; }
+    #game-canvas { background: transparent; border-radius: 18px; box-shadow: 0 8px 32px rgba(60,128,60,0.15); display: block; width: 100vw; height: 64vw; max-width: 100vw; max-height: 100vh; margin: 0 auto; touch-action: manipulation; outline: none; }
+    #ui { width: 100vw; margin: 0; font-size: 1.2em; pointer-events: none; user-select: none; z-index: 1; position: absolute; left: 0; top: 0; height: 80px; }
+    #ivy-count, #boost-count { position: absolute; top: 10px; right: 22px; background: rgba(24,30,48,0.85); color: #f6f6f6; border-radius: 8px; padding: 4px 14px; font-size: 1.15em; min-width: 80px; text-align: right; box-shadow: 0 2px 8px rgba(52,211,153,0.10); letter-spacing: 1px; }
+    #boost-count { top: 48px; min-width: 80px; }
+    #level { position: absolute; top: 10px; left: 22px; background: rgba(24,30,48,0.85); color: #f6f6f6; border-radius: 8px; padding: 4px 14px; font-size: 1.15em; min-width: 80px; text-align: left; box-shadow: 0 2px 8px rgba(52,211,153,0.10); letter-spacing: 1px; }
+    #pause-btn { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2; background: #34d399; color: #181e30; border: none; border-radius: 8px; padding: 7px 24px; font-size: 1.45em; font-weight: bold; letter-spacing: 1px; cursor: pointer; box-shadow: 0 2px 8px rgba(52,211,153,0.10); user-select: none; pointer-events: auto; transition: background .2s, transform .1s; display: flex; align-items: center; justify-content: center; }
+    #pause-btn:active { background: #059669; color: #fff; transform: scale(0.97); }
+    #pause-icon { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: middle; }
+    #pause-icon svg { width: 100%; height: 100%; display: block; }
+    #boost { display: none; }
+    #instructions, #game-over, #paused-panel { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(24,30,48,0.97); color: #e6ffe9; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.28em; text-align: center; animation: fadeIn .36s; pointer-events: auto; padding: 0 4vw; }
+    #instructions ul { text-align: left; margin: 10px 0 20px 0; padding-left: 1.4em; font-size: 1em; }
+    .inline-icon { width: 19px; vertical-align: middle; margin-bottom: 2px; }
+    .boost-icon { font-size: 1.2em; vertical-align: middle; }
+    .game-title {
+      font-family: 'Luckiest Guy', 'Segoe UI', Arial, cursive, sans-serif;
+      font-size: 3em;
+      color: #fff;
+      text-shadow: 0 2px 16px #34d399, 0 1px 0 #181e30, 0 0 4px #7f90ff;
+      margin-bottom: 0.4em;
+      letter-spacing: 2px;
+      line-height: 1.15;
+      animation: fadeInTitle .7s;
+      font-weight: bold;
+      background: linear-gradient(90deg, #ff3434 0%, #34d399 50%, #e7ffb3 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    @keyframes fadeInTitle { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+    button { background: #34d399; color: #181e30; border: none; padding: 22px 44px; border-radius: 10px; font-size: 1.3em; cursor: pointer; margin-top: 24px; box-shadow: 0 2px 8px rgba(52,211,153,0.13); transition: background .2s, transform .1s; font-weight: bold; letter-spacing: 1px; touch-action: manipulation; outline: none; }
+    button:active { background: #059669; color: #fff; transform: scale(0.97); }
+    #final-score { margin: 18px 0; font-size: 1.4em; color: #34d399; }
+    #paused-panel { display: none; }
+    @media (min-aspect-ratio: 4/3) { #game-canvas { height: 75vh !important; width: 100vw !important; } }
+    @media (max-width: 600px) { #game-canvas { width: 100vw !important; height: 64vw !important; } #ui { width: 100vw; } #ivy-count, #level, #boost-count, #pause-btn { font-size: 1em; min-width: 60px; padding: 4px 8px; } .game-title { font-size: 2.1em; } }
+    @media (max-width: 400px) { #game-canvas { height: 75vw !important; } #ivy-count, #level, #boost-count, #pause-btn { font-size: 0.95em; min-width: 48px; padding: 2px 6px; } .game-title { font-size: 1.4em; } }
+  </style>
+  <link href="https://fonts.googleapis.com/css?family=Luckiest+Guy&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" width="1200" height="800" tabindex="0"></canvas>
+    <div id="ui">
+      <div id="ivy-count">Ivy: 0</div>
+      <div id="boost-count">Boost: 0</div>
+      <div id="level">Level: 1</div>
+      <button id="pause-btn" type="button">
+        <span id="pause-icon">
+          <svg viewBox="0 0 22 22">
+            <rect x="4" y="4" width="4" height="14" rx="2" fill="#181e30"/>
+            <rect x="14" y="4" width="4" height="14" rx="2" fill="#181e30"/>
+          </svg>
+        </span>
+      </button>
+      <div id="boost" style="display:none;">Shield: <span id="boost-status">No</span></div>
+    </div>
+    <div id="instructions">
+      <div class="game-title">Ivy Loop Adventure</div>
+      <h2>How to Play</h2>
+      <div style="text-align:left;display:inline-block;">
+      <ul>
+        <li><b>Controls:</b> Tap or click anywhere to jump (double jump allowed), or press <b>Spacebar</b> (desktop/laptop).</li>
+        <li><b>Goal:</b> Collect <img src="https://cdn.discordapp.com/emojis/1398745198472986654.png" class="inline-icon" /> to increase your Ivy count.</li>
+        <li>Collect <span style="font-size:1.2em;">💎</span> for a shield boost. Each boost lets you survive an obstacle or loophole collision. Sparkles animate when boost is collected!</li>
+        <li>Avoid obstacles and holes! Touching any obstacle is game over unless you have a boost.</li>
+        <li>Level and background color change for every 10 Ivy coins collected.</li>
+        <li>You can pause the game at any time.</li>
+      </ul>
+      </div>
+      <button id="start-btn" tabindex="1" autofocus>START GAME</button>
+    </div>
+    <div id="paused-panel">
+      <h2>Paused</h2>
+      <button id="resume-btn" tabindex="3">Resume</button>
+    </div>
+    <div id="game-over" style="display:none">
+      <h2>Game Over!</h2>
+      <div id="final-score"></div>
+      <button id="restart-btn" tabindex="2">PLAY AGAIN</button>
+    </div>
+  </div>
+  <!-- SOUND ELEMENTS -->
+  <audio id="audio-gameover" src="https://upcdn.io/G22nht9/raw/mixkit-arcade-retro-game-over-213.wav" preload="auto"></audio>
+  <audio id="audio-ivy" src="https://upcdn.io/G22nht9/raw/subway-surfers-coin-collect.mp3" preload="auto"></audio>
+  <audio id="audio-boost" src="https://upcdn.io/G22nht9/raw/mixkit-winning-a-coin-video-game-2069.wav" preload="auto"></audio>
+  <audio id="audio-obstacle" src="https://jumpshare.com/s/4U3DgK7Xf9V3H3fC3HqY" preload="auto"></audio>
+  <script>
+    // IMAGES
+    const ivyImg = new window.Image();
+    ivyImg.src = "https://cdn.discordapp.com/emojis/1398745198472986654.png";
+
+    // SOUNDS
+    const soundGameOver = document.getElementById('audio-gameover');
+    const soundIvy = document.getElementById('audio-ivy');
+    const soundBoost = document.getElementById('audio-boost');
+    const soundObstacle = document.getElementById('audio-obstacle');
+
+    // KANGAROO SPRITE (6 frames)
+    const KANGAROO_SCALE = 0.75;
+    const KANGAROO_W = Math.round(64 * KANGAROO_SCALE);
+    const KANGAROO_H = Math.round(56 * KANGAROO_SCALE);
+    function drawKangarooFrame(f, scale=KANGAROO_SCALE) {
+      const c = document.createElement('canvas');
+      c.width = 64 * scale; c.height = 56 * scale;
+      const cx = c.getContext('2d');
+      cx.save();
+      cx.translate(32*scale,38*scale);
+      const hop = Math.abs(Math.sin(f/6*Math.PI*2)) * 8 * scale;
+      cx.translate(0, -hop);
+      cx.save();
+      cx.rotate(0.7 + Math.sin(f/6*Math.PI*2+0.3)*0.1);
+      cx.beginPath();
+      cx.moveTo(-25*scale,15*scale);
+      cx.quadraticCurveTo(-48*scale,12*scale,-31*scale,-10*scale);
+      cx.quadraticCurveTo(-20*scale,-15*scale,-8*scale,8*scale);
+      cx.lineTo(-8*scale,12*scale); cx.lineTo(-25*scale,15*scale); cx.closePath();
+      cx.fillStyle="#c29b6a"; cx.fill();
+      cx.strokeStyle="#8c6341"; cx.lineWidth=2*scale; cx.stroke();
+      cx.restore();
+      cx.save();
+      cx.beginPath();
+      cx.ellipse(0,8*scale,19*scale,13*scale,0,0,2*Math.PI);
+      cx.fillStyle="#e2b378"; cx.fill();
+      cx.strokeStyle="#8c6341"; cx.lineWidth=2*scale; cx.stroke();
+      cx.restore();
+      cx.save();
+      cx.beginPath();
+      cx.ellipse(0,15*scale,9*scale,6*scale,0,0,2*Math.PI);
+      cx.fillStyle="#fffbe6"; cx.fill();
+      cx.restore();
+      cx.save();
+      cx.rotate(Math.sin(f/6*Math.PI*2+Math.PI)*0.38+0.35);
+      cx.beginPath();
+      cx.ellipse(17*scale,13*scale,10*scale,5*scale,0,0,2*Math.PI);
+      cx.fillStyle="#e2b378"; cx.fill();
+      cx.strokeStyle="#8c6341"; cx.lineWidth=2*scale; cx.stroke();
+      cx.restore();
+      cx.save();
+      cx.rotate(Math.sin(f/6*Math.PI*2)*0.22-0.2);
+      cx.beginPath();
+      cx.moveTo(-4*scale,12*scale);
+      cx.lineTo(-17*scale,19*scale);
+      cx.lineTo(-14*scale,23*scale);
+      cx.lineTo(-2*scale,17*scale);
+      cx.closePath();
+      cx.fillStyle="#e2b378"; cx.fill();
+      cx.strokeStyle="#8c6341"; cx.lineWidth=2*scale; cx.stroke();
+      cx.restore();
+      cx.save();
+      cx.translate(14*scale,-6*scale);
+      cx.rotate(Math.sin(f/6*Math.PI*2)*0.07-0.04);
+      cx.save();
+      cx.rotate(-0.15);
+      cx.beginPath();
+      cx.ellipse(-6*scale,-8*scale,3*scale,8*scale,-0.4,0,2*Math.PI);
+      cx.fillStyle="#e2b378"; cx.fill();
+      cx.strokeStyle="#8c6341"; cx.lineWidth=1.3*scale; cx.stroke();
+      cx.restore();
+      cx.save();
+      cx.rotate(0.23);
+      cx.beginPath();
+      cx.ellipse(7*scale,-8*scale,2*scale,7*scale,0.4,0,2*Math.PI);
+      cx.fillStyle="#e2b378"; cx.fill();
+      cx.strokeStyle="#8c6341"; cx.lineWidth=1.3*scale; cx.stroke();
+      cx.restore();
+      cx.beginPath();
+      cx.ellipse(3*scale,0,13*scale,11*scale,0,0,2*Math.PI);
+      cx.fillStyle="#e2b378"; cx.fill();
+      cx.strokeStyle="#8c6341"; cx.lineWidth=2*scale; cx.stroke();
+      cx.beginPath();
+      cx.ellipse(13*scale,6*scale,6*scale,4*scale,0,0,2*Math.PI);
+      cx.fillStyle="#fffbe6"; cx.fill();
+      cx.beginPath();
+      cx.arc(15*scale,1.5*scale,2*scale,0,2*Math.PI);
+      cx.fillStyle="#191919"; cx.fill();
+      cx.beginPath();
+      cx.arc(10*scale,-3*scale,1*scale,0,2*Math.PI);
+      cx.arc(14*scale,-3.5*scale,1*scale,0,2*Math.PI);
+      cx.fillStyle="#222"; cx.fill();
+      cx.restore();
+      cx.restore();
+      return c;
+    }
+    const kangarooFrames = [];
+    for(let f=0;f<6;f++) kangarooFrames.push(drawKangarooFrame(f));
+
+    let sparkles = [];
+    function addSparkle(x, y, color="#ffe600") {
+      for(let i=0;i<15;i++) {
+        sparkles.push({
+          x, y,
+          angle: Math.random()*Math.PI*2,
+          speed: Math.random()*2.7+1.2,
+          life: 18+Math.random()*12,
+          maxLife: 22+Math.random()*14,
+          color
+        });
+      }
+    }
+    function drawSparkles(ctx) {
+      for(let i=sparkles.length-1;i>=0;i--) {
+        let s = sparkles[i];
+        if(s.life<=0) { sparkles.splice(i,1); continue; }
+        let dx = Math.cos(s.angle)*s.speed*(1-s.life/s.maxLife)*8;
+        let dy = Math.sin(s.angle)*s.speed*(1-s.life/s.maxLife)*8;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.18,s.life/s.maxLife);
+        ctx.beginPath();
+        ctx.arc(s.x+dx,s.y+dy,2.2,0,2*Math.PI);
+        ctx.fillStyle = s.color;
+        ctx.fill();
+        ctx.restore();
+        s.life--;
+      }
+    }
+
+    let bgOffset = 0, bgOffsetSlow = 0, bgOffsetCloud = 0;
+    function getLevelColor(level) {
+      const colors = [
+        ['#efe3ff', '#bfc6fa', '#aac6e6'],
+        ['#ffe6e6', '#ffeed6', '#ffe0b3'],
+        ['#d6ffe6', '#b3e6ff', '#b3ffd6'],
+        ['#f7e6ff', '#d4d4ff', '#b3b3ff'],
+        ['#252845', '#374073', '#2e3e5e'],
+        ['#191c23', '#2a2f38', '#242734'],
+        ['#f6f6f6', '#c6e8ff', '#bde7ff']
+      ];
+      return colors[level % colors.length];
+    }
+    function drawDynamicBG(ctx, W, H, time, scrollSpeed, level) {
+      const bgColors = getLevelColor(level);
+      let grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,bgColors[0]);
+      grad.addColorStop(0.5,bgColors[1]);
+      grad.addColorStop(1,bgColors[2]);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,W,H);
+
+      let cloudCount = Math.floor(W/180)+2;
+      for(let i=0;i<cloudCount;i++) {
+        let x = ((i*200-bgOffsetCloud*0.5)%W+W)%W;
+        let y = 55+Math.sin(i+time/1500)*13;
+        ctx.save();
+        ctx.globalAlpha = 0.17+0.08*Math.sin(i*2+time/1700);
+        ctx.beginPath();
+        ctx.ellipse(x, y, 36, 12, 0, 0, 2*Math.PI);
+        ctx.ellipse(x+20, y+8, 22, 9, 0, 0, 2*Math.PI);
+        ctx.ellipse(x-20, y+10, 18, 7, 0, 0, 2*Math.PI);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      let phillY = H-120;
+      ctx.moveTo(0, phillY);
+      for (let x=0; x<=W; x+=30) {
+        let y = phillY + 22*Math.sin((x+bgOffsetSlow*0.25)/160)+8*Math.sin(x/37+Math.sin(x/150));
+        ctx.lineTo(x,y);
+      }
+      ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#e4d0ff";
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.beginPath();
+      let fghillY = H-70;
+      ctx.moveTo(0, fghillY);
+      for (let x=0; x<=W; x+=30) {
+        let y = fghillY + 24*Math.sin((x+bgOffset*1.1)/140)+6*Math.cos(x/45+Math.sin(x/230));
+        ctx.lineTo(x,y);
+      }
+      ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = "#b1d0ff";
+      ctx.fill();
+      ctx.restore();
+
+      for(let i=0;i<30;i++) {
+        let x = (i*97)%W+Math.sin(i+time/6000)*10;
+        let y = (i*223)%H*0.17+16;
+        ctx.globalAlpha = 0.5+0.5*Math.sin(time/700+i*2);
+        ctx.beginPath();
+        ctx.arc(x,y,Math.max(0.5,1.1+0.7*Math.sin(time/800+i*3)),0,2*Math.PI);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
+      for(let i=0;i<Math.floor(W/42)+2;i++) {
+        let gx = ((i*42-bgOffset*2.7)%W+W)%W;
+        let gy = H-33+Math.sin(i*1.2+time/1000)*2;
+        ctx.save();
+        ctx.strokeStyle = "#7c708e";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(gx, gy+6); ctx.lineTo(gx, gy-3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(gx, gy-7, 2, 0, 2*Math.PI);
+        ctx.fillStyle = i%3===0 ? "#ffb4d4" : (i%4===1 ? "#ffe6a0" : "#e3b2fa");
+        ctx.globalAlpha = 0.9;
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawBoost(ctx, x, y, size) {
+      ctx.save();
+      ctx.font = `bold ${size}px serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("💎", x, y+2);
+      ctx.restore();
+    }
+    // Obstacle is now ♨️ and colored red
+    function drawObstacle(ctx, x, y, size) {
+      ctx.save();
+      ctx.font = `bold ${size}px serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ff3434";
+      ctx.fillText("♨️", x, y + 2);
+      ctx.restore();
+    }
+    function drawLoophole(ctx, x, y, width, height) {
+      width = width * 0.5;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, width, height);
+      ctx.fillStyle = "#181e30";
+      ctx.fill();
+      ctx.restore();
+    }
+    function drawGround(ctx, W, groundY) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, groundY, W, ctx.canvas.height - groundY);
+      ctx.fillStyle = "#e2eaff";
+      ctx.fill();
+      let grad = ctx.createLinearGradient(0, groundY - 18, 0, groundY + 24);
+      grad.addColorStop(0, "rgba(210,220,255,0.7)");
+      grad.addColorStop(1, "rgba(226,234,255,0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, groundY - 18, W, 24);
+      ctx.restore();
+    }
+
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let W = canvas.width, H = canvas.height;
+    function resizeCanvas() {
+      let ww = window.innerWidth, wh = window.innerHeight;
+      let aspect = 1.5;
+      let w = ww, h = Math.round(ww / aspect);
+      if(h > wh) { h = wh; w = Math.round(h * aspect); }
+      canvas.width = W = w;
+      canvas.height = H = h;
+      groundY = H - 40;
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function kangarooBaseX() {
+      return Math.max(80, Math.min(W * 0.27, W - 70));
+    }
+
+    let state = "start";
+    let paused = false;
+    let player = {
+      x: kangarooBaseX(),
+      y: H - KANGAROO_H, vy: 0, width: KANGAROO_W, height: KANGAROO_H,
+      onGround: true, boost: 0,
+      jumpCount: 0, maxJumps: 2, vx: 0
+    };
+    let level = 1, ivyCount = 0, groundY = H - 40;
+    let obstacles = [], ivies = [], boosts = [], loopholes = [];
+    let scrollSpeed = 2.1, gravity = 0.65, jumpStrength = 15, gameTick = 0;
+
+    const ivyCountDiv = document.getElementById('ivy-count');
+    const levelDiv = document.getElementById('level');
+    const boostCountDiv = document.getElementById('boost-count');
+    const finalScoreDiv = document.getElementById('final-score');
+    const instructions = document.getElementById('instructions');
+    const gameOverDiv = document.getElementById('game-over');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const pausedPanel = document.getElementById('paused-panel');
+    const resumeBtn = document.getElementById('resume-btn');
+
+    function updateUI() {
+      ivyCountDiv.textContent = `Ivy: ${Math.floor(ivyCount)}`;
+      levelDiv.textContent = `Level: ${level}`;
+      boostCountDiv.textContent = `Boost: ${player.boost}`;
+    }
+
+    function endGame() {
+      state = "gameover";
+      finalScoreDiv.textContent = `Your Ivy count: ${Math.floor(ivyCount)} (Level ${level})`;
+      gameOverDiv.style.display = "";
+      // Play game over sound
+      if (soundGameOver) {
+        soundGameOver.currentTime = 0;
+        soundGameOver.play().catch(()=>{});
+      }
+    }
+
+    function collidesCircle(ax, ay, ar, bx, by, br) {
+      return Math.hypot(ax - bx, ay - by) < (ar + br) * 0.85;
+    }
+
+    function maybeSpawn(x) {
+      let rng = Math.random();
+      if (rng < 0.11 && loopholes.length < 2) {
+        let width = (64 + Math.random() * 45) * 0.75;
+        loopholes.push({ x: x, width: width });
+        return;
+      }
+      if (rng < 0.16) {
+        obstacles.push({ x: x, y: groundY - 10 });
+        let roll = Math.random();
+        if (roll < 0.45) {
+          let safe = true;
+          for (let ivy of ivies) if (Math.abs(ivy.x - x) < 70) safe = false;
+          if (safe) ivies.push({ x: x, y: groundY - 54 - 16 });
+        } else if (roll < 0.58) {
+          let safeBoost = true;
+          for (let boost of boosts) if (Math.abs(boost.x - x) < 70) safeBoost = false;
+          for (let ivy of ivies) if (Math.abs(ivy.x - x) < 70) safeBoost = false;
+          if (safeBoost) boosts.push({ x: x, y: groundY - 54 - 16 });
+        }
+        return;
+      }
+      if (rng < 0.21) {
+        let safeBoost = true;
+        for (let ivy of ivies) if (Math.abs(ivy.x - x) < 70) safeBoost = false;
+        if (safeBoost) boosts.push({ x: x, y: groundY - 44 - 10 });
+        return;
+      }
+      if (rng < 0.80) {
+        let safeIvy = true;
+        for (let ivy of ivies) if (Math.abs(ivy.x - x) < 70) safeIvy = false;
+        for (let boost of boosts) if (Math.abs(boost.x - x) < 70) safeIvy = false;
+        if (safeIvy) ivies.push({ x: x, y: groundY - 16 });
+        return;
+      }
+    }
+
+    function gameLoop() {
+      if (state !== "playing" || paused) return;
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+      resizeCanvas();
+      state = "playing";
+      paused = false;
+      level = 1; ivyCount = 0;
+      player.boost = 0;
+      scrollSpeed = 2.1;
+      player.x = kangarooBaseX(); player.y = groundY - player.height/2;
+      player.vy = 0; player.onGround = true;
+      player.jumpCount = 0; player.vx = 0;
+      player.width = KANGAROO_W; player.height = KANGAROO_H;
+      obstacles = []; ivies = []; boosts = []; loopholes = [];
+      gameTick = 0;
+      sparkles = [];
+      bgOffset = 0; bgOffsetSlow = 0; bgOffsetCloud = 0;
+      instructions.style.display = "none";
+      pausedPanel.style.display = "none";
+      gameOverDiv.style.display = "none";
+      updateUI();
+      for (let x = 300; x < W + 300; x += 120) maybeSpawn(x);
+      requestAnimationFrame(gameLoop);
+    }
+
+    function update() {
+      gameTick++;
+      bgOffset += scrollSpeed;
+      bgOffsetSlow += scrollSpeed * 0.45;
+      bgOffsetCloud += scrollSpeed * 0.17;
+
+      player.x = kangarooBaseX();
+      player.y += player.vy;
+      player.vy += gravity;
+
+      if (player.y > groundY - player.height / 2) {
+        player.y = groundY - player.height / 2;
+        player.vy = 0;
+        player.onGround = true;
+        player.jumpCount = 0;
+      } else {
+        player.onGround = false;
+      }
+
+      for (let arr of [obstacles, ivies, boosts, loopholes]) {
+        for (let obj of arr) obj.x -= scrollSpeed;
+        while (arr.length && arr[0].x < -120) arr.shift();
+      }
+
+      if (obstacles.length === 0 || obstacles[obstacles.length-1].x < W - 240) maybeSpawn(W + 80);
+
+      let kangarooRadius = Math.max(KANGAROO_W, KANGAROO_H) / 2.1;
+      for (let i = ivies.length - 1; i >= 0; i--) {
+        let ivy = ivies[i];
+        let ivyRadius = 14;
+        if (collidesCircle(player.x, player.y, kangarooRadius, ivy.x, ivy.y, ivyRadius)) {
+          ivies.splice(i, 1);
+          ivyCount += 1;
+          let oldLevel = level;
+          level = 1 + Math.floor(ivyCount / 10);
+          if (level !== oldLevel) {
+            // background color will change automatically
+          }
+          updateUI();
+          if (soundIvy) { soundIvy.currentTime = 0; soundIvy.play().catch(()=>{}); }
+        }
+      }
+      for (let i = boosts.length - 1; i >= 0; i--) {
+        let boost = boosts[i];
+        let boostRadius = 9;
+        if (collidesCircle(player.x, player.y, kangarooRadius, boost.x, boost.y, boostRadius)) {
+          boosts.splice(i, 1);
+          player.boost += 1;
+          addSparkle(boost.x, boost.y, "#ffe600");
+          updateUI();
+          if (soundBoost) { soundBoost.currentTime = 0; soundBoost.play().catch(()=>{}); }
+        }
+      }
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        let obs = obstacles[i];
+        const obsSize = 30 * 0.75;
+        let obsX = obs.x, obsY = obs.y, obsW = obsSize*0.36, obsH = obsSize*0.28;
+        let collision =
+          player.x + KANGAROO_W/2 > obsX - obsSize*0.18 &&
+          player.x - KANGAROO_W/2 < obsX - obsSize*0.18 + obsW &&
+          player.y + KANGAROO_H/2 > obsY - obsSize*0.08 &&
+          player.y - KANGAROO_H/2 < obsY - obsSize*0.08 + obsH;
+        if (collision) {
+          if (player.boost > 0) {
+            player.boost -= 1;
+            updateUI();
+            obstacles.splice(i, 1);
+            addSparkle(obs.x, obs.y, "#34d399");
+            // Play obstacle sound
+            if (soundObstacle) { soundObstacle.currentTime = 0; soundObstacle.play().catch(()=>{}); }
+          } else {
+            endGame();
+            return;
+          }
+        }
+      }
+      for (let loop of loopholes) {
+        let loopLeft = loop.x;
+        let loopRight = loop.x + (loop.width ? loop.width * 0.5 : 1);
+        const playerBottom = player.y + player.height / 2;
+        const isOnGround = Math.abs(playerBottom - groundY) < 8;
+        const playerLeft = player.x - player.width/2;
+        const playerRight = player.x + player.width/2;
+        if (
+          isOnGround &&
+          playerLeft > loopLeft &&
+          playerRight < loopRight
+        ) {
+          if (player.boost > 0) {
+            player.boost -= 1;
+            updateUI();
+            addSparkle(player.x, player.y, "#ffe600");
+            player.vy = -jumpStrength * 0.7;
+            player.jumpCount = 1;
+          } else {
+            endGame();
+            return;
+          }
+        }
+      }
+    }
+
+    function draw() {
+      drawDynamicBG(ctx, W, H, performance.now(), scrollSpeed, level);
+      drawGround(ctx, W, groundY);
+      for (let loop of loopholes) drawLoophole(ctx, loop.x, groundY, loop.width || 1, H - groundY);
+      for (let ivy of ivies) ctx.drawImage(ivyImg, ivy.x - 14, ivy.y - 14, 28, 28);
+      for (let boost of boosts) drawBoost(ctx, boost.x, boost.y, 17);
+      for (let obs of obstacles) drawObstacle(ctx, obs.x, obs.y, 30);
+      drawSparkles(ctx);
+      let frame = Math.floor(performance.now()/80)%kangarooFrames.length;
+      ctx.save();
+      ctx.translate(player.x, player.y-KANGAROO_H/1.5);
+      ctx.drawImage(kangarooFrames[frame], -KANGAROO_W/2, 0, KANGAROO_W, KANGAROO_H);
+      ctx.restore();
+      ctx.save(); ctx.globalAlpha = 0.22;
+      ctx.beginPath();
+      ctx.ellipse(player.x, groundY + 13, 12, 5, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = "#222";
+      ctx.fill(); ctx.restore();
+    }
+
+    function jump() {
+      if (player.jumpCount < player.maxJumps) {
+        player.vy = -jumpStrength;
+        player.jumpCount++;
+      }
+    }
+
+    function pauseHandler(e) {
+      e && e.preventDefault && e.preventDefault();
+      if (state === "playing" && !paused) {
+        paused = true;
+        pausedPanel.style.display = "flex";
+      }
+    }
+    function resumeHandler(e) {
+      e && e.preventDefault && e.preventDefault();
+      if (state === "playing" && paused) {
+        paused = false;
+        pausedPanel.style.display = "none";
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    function startHandler(e) {
+      e && e.preventDefault && e.preventDefault();
+      instructions.style.display = "none";
+      setTimeout(() => { resizeCanvas(); startGame(); }, 60);
+    }
+    function restartHandler(e) {
+      e && e.preventDefault && e.preventDefault();
+      gameOverDiv.style.display = "none";
+      setTimeout(() => { resizeCanvas(); startGame(); }, 60);
+    }
+    startBtn.addEventListener('click', startHandler, { passive: false });
+    startBtn.addEventListener('touchstart', startHandler, { passive: false });
+    restartBtn.addEventListener('click', restartHandler, { passive: false });
+    restartBtn.addEventListener('touchstart', restartHandler, { passive: false });
+    pauseBtn.addEventListener('click', pauseHandler, { passive: false });
+    pauseBtn.addEventListener('touchstart', pauseHandler, { passive: false });
+    resumeBtn.addEventListener('click', resumeHandler, { passive: false });
+    resumeBtn.addEventListener('touchstart', resumeHandler, { passive: false });
+
+    document.addEventListener('keydown', e => {
+      if ((e.code === "Space" || e.key === " ") && state === "playing" && !paused) jump();
+      if ((e.code === "Space" || e.key === " ") && state === "gameover") restartHandler(e);
+      if ((e.code === "KeyP" || e.key === "p") && state === "playing") pauseHandler(e);
+      if ((e.code === "KeyR" || e.key === "r") && state === "playing" && paused) resumeHandler(e);
+    });
+    canvas.addEventListener('pointerdown', () => { if (state === "playing" && !paused) jump(); if (state === "gameover") restartHandler(); });
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); if (state === "playing" && !paused) jump(); if (state === "gameover") restartHandler(); });
+
+    document.body.addEventListener('touchmove', function(e){ e.preventDefault(); }, { passive:false });
+
+    resizeCanvas();
+    draw();
+    setTimeout(() => { startBtn.focus(); }, 400);
+  </script>
+</body>
+</html>
